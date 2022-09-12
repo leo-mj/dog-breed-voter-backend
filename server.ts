@@ -26,9 +26,37 @@ app.use(cors()) //add CORS support to each following route handler
 const client = new Client(dbConfig);
 client.connect();
 
-app.get("/", async (req, res) => {
-  const dbres = await client.query('select * from categories');
-  res.json(dbres.rows);
+app.post("/", async (req, res) => {
+  const upvotedDog = req.body.upvotedDog;
+  try {
+    const submission = await client.query(`INSERT INTO dog_votes(dog_breed, votes)
+      VALUES($1, $2) 
+      ON CONFLICT (dog_breed)
+      DO UPDATE SET votes = (SELECT 1 + b.votes FROM dog_votes b WHERE b.dog_breed = $1)
+      RETURNING *`,
+      [upvotedDog, 1]);
+    res.json(submission.rows);}
+  catch(err) {
+    console.error(err);
+  }
+})
+
+app.get("/topTen", async (req, res) => {
+  try {
+    const dbres = await client.query('select * from dog_votes order by votes desc limit 10');
+    res.json(dbres.rows);
+  } catch(err) {
+    console.error(err);
+  }
+});
+
+app.get("/topThree", async (req, res) => {
+  try {
+    const dbres = await client.query('select * from dog_votes order by votes desc limit 3');
+    res.json(dbres.rows);
+  } catch(err) {
+    console.error(err);
+  }
 });
 
 
