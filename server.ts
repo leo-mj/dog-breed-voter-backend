@@ -41,7 +41,7 @@ const mySocket = io.on('connection', function(socket){
 app.use(express.json()); //add body parser to each following route handler
 app.use(cors()) //add CORS support to each following route handler
 
-const client = new Client("dogbreedvoter");
+const client = new Client(dbConfig);
 client.connect();
 async function toSendData(dataToSend: IDataTopTen[]) {
   console.log("returning", (dataToSend))
