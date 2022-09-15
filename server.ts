@@ -2,6 +2,8 @@ import { Client } from "pg";
 import { config } from "dotenv";
 import express from "express";
 import cors from "cors";
+import http from "http";
+import {Server} from "socket.io";
 
 config(); //Read .env file lines as though they were env vars.
 
@@ -18,13 +20,33 @@ const dbConfig = {
   ssl: sslSetting,
 };
 
+
+interface IDataTopTen {
+  breed_id: number;
+  dog_breed: string;
+  votes: number;
+}
+
 const app = express();
+const server = http.createServer(app)
+const io = new Server(server, {
+  cors: {
+    origin:'*'
+  }
+});
+const mySocket = io.on('connection', function(socket){
+  console.log("connected")
+})
 
 app.use(express.json()); //add body parser to each following route handler
 app.use(cors()) //add CORS support to each following route handler
 
-const client = new Client(dbConfig);
+const client = new Client("dogbreedvoter");
 client.connect();
+async function toSendData(dataToSend: IDataTopTen[]) {
+  console.log("returning", (dataToSend))
+  mySocket.emit("messageTosend", (dataToSend))
+}
 
 app.post("/", async (req, res) => {
   const upvotedDog = req.body.upvotedDog;
@@ -35,7 +57,12 @@ app.post("/", async (req, res) => {
       DO UPDATE SET votes = (SELECT 1 + b.votes FROM dog_votes b WHERE b.dog_breed = $1)
       RETURNING *`,
       [upvotedDog, 1]);
-    res.json(submission.rows);}
+    res.json(submission.rows);
+    const data = await client.query(`SELECT * FROM dog_votes ORDER BY votes DESC LIMIT 10;`);
+    console.log("INSIDE route", (submission.rows))
+    await toSendData(data.rows)
+  }
+
   catch(err) {
     console.error(err);
   }
@@ -65,6 +92,6 @@ const port = process.env.PORT;
 if (!port) {
   throw 'Missing PORT environment variable.  Set it in .env file.';
 }
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is up and running on port ${port}`);
 });
